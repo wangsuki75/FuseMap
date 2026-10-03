@@ -6,8 +6,7 @@ export enum PixelationMode {
   Average = 'average',   // 真实模式（平均色）
 }
 
-// 定义色号系统类型
-export type ColorSystem = 'MARD' | 'COCO' | '漫漫' | '盼盼' | '咪小窝';
+// 色号系统类型已迁移到 colorSystemUtils（现在表示色板 id），此处不再重复定义。
 
 // --- 必要的类型定义 ---
 export interface RgbColor {

@@ -1,128 +1,130 @@
-import { PaletteColor } from './pixelation';
-import colorSystemMapping from '../app/colorSystemMapping.json';
+import { getPalette, listPalettes } from '../core/palette/registry';
+import { toSelectableColors } from '../core/palette/dedupe';
+import type { PaletteColor } from './pixelation';
 
-// 定义色号系统类型并导出
-export type ColorSystem = 'MARD' | 'COCO' | '漫漫' | '盼盼' | '咪小窝';
+/**
+ * 兼容层：保留原有函数签名，把底层数据源从"hex 交叉表"换成 per-brand 独立色板。
+ *
+ * 历史上 ColorSystem 是 'MARD' | 'COCO' | ... 五个品牌名，用一张
+ * hex → 五品牌色号 的交叉表查表。现在它表示**色板 id**（如 'mard-221'），
+ * 每个色板各自持有一套 HEX 与色号。
+ *
+ * 之所以保留签名而不做全量重命名：调用点分布在 10 个文件、88 处，
+ * 全量改写风险远大于收益。彻底清理命名留到后续重构。
+ */
+export type ColorSystem = string;
 
-// 色号系统选项
-export const colorSystemOptions = [
-  { key: 'MARD', name: 'MARD' },
-  { key: 'COCO', name: 'COCO' },
-  { key: '漫漫', name: '漫漫' },
-  { key: '盼盼', name: '盼盼' },
-  { key: '咪小窝', name: '咪小窝' },
-];
+export const DEFAULT_COLOR_SYSTEM = 'mard-221';
 
-// 类型定义
-type ColorMapping = Record<string, Record<ColorSystem, string>>;
-const typedColorSystemMapping = colorSystemMapping as ColorMapping;
+export const colorSystemOptions = listPalettes().map((palette) => ({
+  key: palette.id,
+  name: palette.name,
+}));
 
-// 获取所有可用的hex值
-export function getAllHexValues(): string[] {
-  return Object.keys(typedColorSystemMapping);
+/**
+ * 把持久化里的值归一化成有效色板 id。
+ * 早期版本存的是 'MARD' 这类品牌名，读到未知值时回退到默认色板，
+ * 避免升级后老用户看到满屏 '?'。
+ */
+export function normalizeColorSystem(value: string | null | undefined): ColorSystem {
+  if (value && getPalette(value)) return value;
+  return DEFAULT_COLOR_SYSTEM;
 }
 
-// 获取所有MARD色号到hex值的映射（用于向后兼容）
-export function getMardToHexMapping(): Record<string, string> {
-  const mapping: Record<string, string> = {};
-  Object.entries(typedColorSystemMapping).forEach(([hex, colorData]) => {
-    const mardKey = colorData.MARD;
-    if (mardKey) {
-      mapping[mardKey] = hex;
+/**
+ * 色板内 hex → 色号的索引。
+ *
+ * 注意：上游数据里同一色板内存在重复 HEX（如 COCO 的 #FFFFFF 同时是 A01 与 L14）。
+ * 本层以 HEX 作为颜色身份（与图纸数据结构一致），因此重复项只保留先出现的一个。
+ * 这会让极少数颜色无法被选中，属于已知限制，详见 tests/unit/color-system.test.ts。
+ */
+const hexToCodeCache = new Map<string, Map<string, string>>();
+
+function hexToCodeMap(paletteId: string): Map<string, string> {
+  let map = hexToCodeCache.get(paletteId);
+  if (!map) {
+    map = new Map();
+    const palette = getPalette(paletteId);
+    if (palette) {
+      for (const color of toSelectableColors(palette)) {
+        map.set(color.hex.toUpperCase(), color.code);
+      }
     }
-  });
+    hexToCodeCache.set(paletteId, map);
+  }
+  return map;
+}
+
+export function getAllHexValues(): string[] {
+  const palette = getPalette(DEFAULT_COLOR_SYSTEM);
+  return palette ? palette.colors.map((color) => color.hex.toUpperCase()) : [];
+}
+
+/** @deprecated 旧接口，保留给尚未迁移的调用点。 */
+export function getMardToHexMapping(): Record<string, string> {
+  const palette = getPalette(DEFAULT_COLOR_SYSTEM);
+  const mapping: Record<string, string> = {};
+  if (palette) {
+    for (const color of palette.colors) mapping[color.code] = color.hex.toUpperCase();
+  }
   return mapping;
 }
 
-// 从colorSystemMapping.json加载完整的颜色映射数据
-export function loadFullColorMapping(): Map<string, Record<ColorSystem, string>> {
-  const mapping = new Map<string, Record<ColorSystem, string>>();
-  Object.entries(colorSystemMapping).forEach(([baseKey, colorData]) => {
-    mapping.set(baseKey, colorData as Record<ColorSystem, string>);
-  });
+/** @deprecated 旧接口，保留给尚未迁移的调用点。 */
+export function loadFullColorMapping(): Map<string, Record<string, string>> {
+  const mapping = new Map<string, Record<string, string>>();
+  for (const palette of listPalettes()) {
+    for (const color of palette.colors) {
+      const key = color.hex.toUpperCase();
+      const row = mapping.get(key) ?? {};
+      row[palette.id] = color.code;
+      mapping.set(key, row);
+    }
+  }
   return mapping;
 }
 
-// 将色板转换到指定色号系统
 export function convertPaletteToColorSystem(
   palette: PaletteColor[],
   colorSystem: ColorSystem
 ): PaletteColor[] {
-  return palette.map(color => {
-    const colorMapping = typedColorSystemMapping[color.hex];
-    if (colorMapping && colorMapping[colorSystem]) {
-      return {
-        ...color,
-        key: colorMapping[colorSystem]
-      };
-    }
-    return color; // 如果找不到映射，保持原样
+  const map = hexToCodeMap(colorSystem);
+  return palette.map((color) => {
+    const code = map.get(color.hex.toUpperCase()) ?? map.get(color.key.toUpperCase());
+    return code ? { ...color, key: code } : color;
   });
 }
 
-// 获取指定色号系统的显示键 - 基于hex值的简化版本
 export function getDisplayColorKey(hexValue: string, colorSystem: ColorSystem): string {
-  // 对于特殊键（如透明键），直接返回原键
   if (hexValue === 'ERASE' || hexValue.length === 0 || hexValue === '?') {
     return hexValue;
   }
-  
-  // 标准化hex值（确保大写）
-  const normalizedHex = hexValue.toUpperCase();
-  
-  // 通过hex值从colorSystemMapping获取目标色号系统的值
-  const colorMapping = typedColorSystemMapping[normalizedHex];
-  if (colorMapping && colorMapping[colorSystem]) {
-    return colorMapping[colorSystem];
-  }
-  
-  return '?'; // 如果找不到映射，返回 '?'
+  return hexToCodeMap(colorSystem).get(hexValue.toUpperCase()) ?? '?';
 }
 
-// 将色号键转换到hex值（支持任意色号系统）
+/** 通过色号反查该色板内的 HEX。找不到时原样返回入参。 */
 export function convertColorKeyToHex(displayKey: string, colorSystem: ColorSystem): string {
-  // 如果已经是hex值，直接返回
   if (displayKey.startsWith('#') && displayKey.length === 7) {
     return displayKey.toUpperCase();
   }
-  
-  // 在colorSystemMapping中查找对应的hex值
-  for (const [hex, mapping] of Object.entries(typedColorSystemMapping)) {
-    if (mapping[colorSystem] === displayKey) {
-      return hex;
-    }
+  const palette = getPalette(colorSystem);
+  if (palette) {
+    const hit = palette.colors.find((color) => color.code === displayKey);
+    if (hit) return hit.hex.toUpperCase();
   }
-  
-  return displayKey; // 如果找不到映射，返回原键
+  return displayKey;
 }
 
-// 验证颜色在指定系统中是否有效
 export function isValidColorInSystem(hexValue: string, colorSystem: ColorSystem): boolean {
-  const mapping = typedColorSystemMapping[hexValue];
-  return mapping && mapping[colorSystem] !== undefined;
+  return hexToCodeMap(colorSystem).has(hexValue.toUpperCase());
 }
 
-// 通过hex值获取指定色号系统的色号
 export function getColorKeyByHex(hexValue: string, colorSystem: ColorSystem): string {
-  // 标准化hex值（确保大写）
-  const normalizedHex = hexValue.toUpperCase();
-  
-  // 查找映射
-  const mapping = typedColorSystemMapping[normalizedHex];
-  if (mapping && mapping[colorSystem]) {
-    return mapping[colorSystem];
-  }
-  
-  // 如果找不到映射，返回 '?'
-  return '?';
+  return hexToCodeMap(colorSystem).get(hexValue.toUpperCase()) ?? '?';
 }
 
-// 将hex颜色转换为HSL
 function hexToHsl(hex: string): { h: number; s: number; l: number } {
-  // 移除 # 符号
   const cleanHex = hex.replace('#', '');
-  
-  // 转换为RGB
   const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
   const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
   const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
@@ -130,14 +132,12 @@ function hexToHsl(hex: string): { h: number; s: number; l: number } {
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
   const diff = max - min;
-  
-  let h = 0;
-  let s = 0;
   const l = (max + min) / 2;
 
+  let h = 0;
+  let s = 0;
   if (diff !== 0) {
     s = l > 0.5 ? diff / (2 - max - min) : diff / (max + min);
-
     switch (max) {
       case r:
         h = ((g - b) / diff + (g < b ? 6 : 0)) / 6;
@@ -150,27 +150,15 @@ function hexToHsl(hex: string): { h: number; s: number; l: number } {
         break;
     }
   }
-
   return { h: h * 360, s: s * 100, l: l * 100 };
 }
 
-// 按色相排序颜色
 export function sortColorsByHue<T extends { color: string }>(colors: T[]): T[] {
   return colors.slice().sort((a, b) => {
     const hslA = hexToHsl(a.color);
     const hslB = hexToHsl(b.color);
-    
-    // 首先按色相排序
-    if (Math.abs(hslA.h - hslB.h) > 5) { // 增加色相容差，让更相近的色相归为一组
-      return hslA.h - hslB.h;
-    }
-    
-    // 色相相近时，按明度排序（从浅到深）
-    if (Math.abs(hslA.l - hslB.l) > 3) {
-      return hslB.l - hslA.l; // 浅色（高明度）在前，深色（低明度）在后
-    }
-    
-    // 明度也相近时，按饱和度排序（高饱和度在前，让鲜艳的颜色更突出）
+    if (Math.abs(hslA.h - hslB.h) > 5) return hslA.h - hslB.h;
+    if (Math.abs(hslA.l - hslB.l) > 3) return hslB.l - hslA.l;
     return hslB.s - hslA.s;
   });
-} 
+}

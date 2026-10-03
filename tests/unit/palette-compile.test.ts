@@ -5,8 +5,12 @@ import {
   renderTypeScript,
   SPECS,
 } from '../../scripts/lib/palette-compile.mjs';
+import type { PaletteSpec } from '../../src/core/palette/types';
 
 const SRC = 'vendor/pindou-color-data';
+
+/** 编译产物必须符合 core 的 PaletteSpec，这里显式声明以便类型检查真正生效。 */
+type CompileResult = { palettes: PaletteSpec[]; problems: string[] };
 
 describe('normalizeHex', () => {
   it('统一为大写', () => {
@@ -24,7 +28,7 @@ describe('normalizeHex', () => {
 });
 
 describe('compilePalettes', () => {
-  const { palettes, problems } = compilePalettes(SRC);
+  const { palettes, problems } = compilePalettes(SRC) as CompileResult;
 
   it('不应有校验问题', () => {
     expect(problems).toEqual([]);
@@ -78,7 +82,7 @@ describe('renderTypeScript', () => {
   };
 
   it('产出文件带自动生成声明与来源标注', () => {
-    const { palettes } = compilePalettes(SRC);
+    const { palettes } = compilePalettes(SRC) as CompileResult;
     const out = renderTypeScript(palettes, meta);
     expect(out).toContain('自动生成');
     expect(out).toContain(meta.commit);
@@ -86,14 +90,14 @@ describe('renderTypeScript', () => {
   });
 
   it('导出 PALETTES 与 PALETTE_SOURCE', () => {
-    const { palettes } = compilePalettes(SRC);
+    const { palettes } = compilePalettes(SRC) as CompileResult;
     const out = renderTypeScript(palettes, meta);
     expect(out).toContain('export const PALETTES');
     expect(out).toContain('export const PALETTE_SOURCE');
   });
 
   it('内联的色板数据可被 JSON 还原且数量一致', () => {
-    const { palettes } = compilePalettes(SRC);
+    const { palettes } = compilePalettes(SRC) as CompileResult;
     const out = renderTypeScript(palettes, meta);
     const start = out.indexOf('export const PALETTES: PaletteSpec[] = ');
     const json = out.slice(start + 'export const PALETTES: PaletteSpec[] = '.length).replace(/;\s*$/, '');

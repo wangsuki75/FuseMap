@@ -21,14 +21,16 @@ import { GridDownloadOptions } from '../types/downloadTypes';
 import DownloadSettingsModal, { gridLineColorOptions } from '../components/DownloadSettingsModal';
 import { downloadImage, importCsvData } from '../utils/imageDownloader';
 
-import { 
-  colorSystemOptions, 
-  convertPaletteToColorSystem, 
+import {
+  colorSystemOptions,
+  convertPaletteToColorSystem,
   getColorKeyByHex,
-  getMardToHexMapping,
   sortColorsByHue,
-  ColorSystem 
+  DEFAULT_COLOR_SYSTEM,
+  ColorSystem,
 } from '../utils/colorSystemUtils';
+import { getPalette } from '../core/palette/registry';
+import { toSelectableColors } from '../core/palette/dedupe';
 
 // 添加自定义动画样式
 const floatAnimation = `
@@ -63,22 +65,8 @@ function sortColorKeys(a: string, b: string): number {
   return a.localeCompare(b);
 }
 
-// --- Define available palette key sets ---
-// 从colorSystemMapping.json获取所有MARD色号
-const mardToHexMapping = getMardToHexMapping();
-
-// Pre-process the FULL palette data once - 使用colorSystemMapping而不是beadPaletteData
-const fullBeadPalette: PaletteColor[] = Object.entries(mardToHexMapping)
-  .map(([mardKey, hex]) => {
-    const rgb = hexToRgb(hex);
-    if (!rgb) {
-      console.warn(`Invalid hex code "${hex}" for MARD key "${mardKey}". Skipping.`);
-      return null;
-    }
-    // 使用hex值作为key，符合新的架构设计
-    return { key: hex, hex, rgb };
-  })
-  .filter((color): color is PaletteColor => color !== null);
+// 色板数据来自 core/palette 的 per-brand 独立色板，不再有模块级常量。
+// 当前色板的颜色列表在组件内按选中色板用 useMemo 构建，见下方 fullBeadPalette。
 
 // ++ Add definition for background color keys ++
 
@@ -106,12 +94,24 @@ export default function Home() {
   // 添加像素化模式状态
   const [pixelationMode, setPixelationMode] = useState<PixelationMode>(PixelationMode.Dominant); // 默认为卡通模式
   
-  // 新增：色号系统选择状态
-  const [selectedColorSystem, setSelectedColorSystem] = useState<ColorSystem>('MARD');
-  
-  const [activeBeadPalette, setActiveBeadPalette] = useState<PaletteColor[]>(() => {
-      return fullBeadPalette; // 默认使用全部颜色
-  });
+  // 当前色板 id。历史上叫"色号系统"，现在直接对应 core/palette 中的一个 per-brand 色板。
+  const [selectedColorSystem, setSelectedColorSystem] = useState<ColorSystem>(DEFAULT_COLOR_SYSTEM);
+
+  // 当前色板的全部颜色。key 仍取 HEX，图纸数据结构保持不变。
+  const fullBeadPalette: PaletteColor[] = useMemo(() => {
+    const palette = getPalette(selectedColorSystem);
+    if (!palette) return [];
+    const colors: PaletteColor[] = [];
+    // 去重与占位色号过滤的规则集中在 core/palette/dedupe，避免多处各写一份。
+    for (const color of toSelectableColors(palette)) {
+      const rgb = hexToRgb(color.hex);
+      if (!rgb) continue;
+      colors.push({ key: color.hex.toUpperCase(), hex: color.hex, rgb });
+    }
+    return colors;
+  }, [selectedColorSystem]);
+
+  const [activeBeadPalette, setActiveBeadPalette] = useState<PaletteColor[]>(() => fullBeadPalette);
   // 状态变量：存储被排除的颜色（hex值）
   const [excludedColorKeys, setExcludedColorKeys] = useState<Set<string>>(new Set());
   const [showExcludedColors, setShowExcludedColors] = useState<boolean>(false);
@@ -341,7 +341,7 @@ export default function Home() {
     // 根据选择的色号系统转换调色板
     const convertedPalette = convertPaletteToColorSystem(newActiveBeadPalette, selectedColorSystem);
     setActiveBeadPalette(convertedPalette);
-  }, [customPaletteSelections, excludedColorKeys, remapTrigger, selectedColorSystem]);
+  }, [customPaletteSelections, excludedColorKeys, remapTrigger, selectedColorSystem, fullBeadPalette]);
 
   // ++ 添加：当状态变化时同步更新输入框的值 ++
   useEffect(() => {
@@ -425,7 +425,27 @@ export default function Home() {
       setCustomPaletteSelections(initialSelections);
       setIsCustomPalette(false);
     }
-  }, []); // 只在组件首次加载时执行
+    // 刻意只在挂载时执行一次：这是"从 localStorage 恢复用户上次勾选"的初始化逻辑。
+    // 若把 fullBeadPalette 纳入依赖，切换色板时会重新读回旧选择并覆盖当前状态。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 切换色板时重置勾选。不同色板的 HEX 集合不同，旧勾选在新色板里会全部失配，
+  // 导致可用颜色被清空、图纸直接变成空白。这里重置为全选并清掉持久化的旧选择。
+  const isFirstPaletteRun = useRef(true);
+  useEffect(() => {
+    if (isFirstPaletteRun.current) {
+      isFirstPaletteRun.current = false;
+      return;
+    }
+    const allHexValues = fullBeadPalette.map(color => color.hex.toUpperCase());
+    setCustomPaletteSelections(presetToSelections(allHexValues, allHexValues));
+    setExcludedColorKeys(new Set());
+    setIsCustomPalette(false);
+    localStorage.removeItem('customPerlerPaletteSelections');
+    // fullBeadPalette 由 selectedColorSystem 派生，无需单独列出。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedColorSystem]);
 
   // 更新 activeBeadPalette 基于自定义选择和排除列表
   useEffect(() => {
@@ -438,7 +458,7 @@ export default function Home() {
     });
     // 不进行色号系统转换，保持原始的MARD色号和hex值
     setActiveBeadPalette(newActiveBeadPalette);
-  }, [customPaletteSelections, excludedColorKeys, remapTrigger]);
+  }, [customPaletteSelections, excludedColorKeys, remapTrigger, fullBeadPalette]);
 
   // --- Event Handlers ---
 

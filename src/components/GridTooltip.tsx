@@ -1,5 +1,9 @@
 import React from 'react';
-import { getDisplayColorKey, ColorSystem } from '../utils/colorSystemUtils';
+import {
+  getDisplayColorKey,
+  DEFAULT_COLOR_SYSTEM,
+  ColorSystem,
+} from '../utils/colorSystemUtils';
 
 interface TooltipData {
   x: number;
@@ -13,7 +17,10 @@ interface GridTooltipProps {
   selectedColorSystem?: ColorSystem;
 }
 
-const GridTooltip: React.FC<GridTooltipProps> = ({ tooltipData, selectedColorSystem = 'MARD' }) => {
+const GridTooltip: React.FC<GridTooltipProps> = ({
+  tooltipData,
+  selectedColorSystem = DEFAULT_COLOR_SYSTEM,
+}) => {
   if (!tooltipData) return null;
 
   return (

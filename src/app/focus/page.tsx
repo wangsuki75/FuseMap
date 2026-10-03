@@ -18,7 +18,10 @@ import ColorPanel from '../../components/ColorPanel';
 import SettingsPanel from '../../components/SettingsPanel';
 import CelebrationAnimation from '../../components/CelebrationAnimation';
 import CompletionCard from '../../components/CompletionCard';
-import { getColorKeyByHex, ColorSystem } from '../../utils/colorSystemUtils';
+import {
+  getColorKeyByHex,
+  normalizeColorSystem,
+} from '../../utils/colorSystemUtils';
 
 interface FocusModeState {
   // 当前状态
@@ -142,7 +145,10 @@ export default function FocusMode() {
         const colors = Object.entries(colorCounts).map(([, colorData]) => {
           const data = colorData as { color: string; count: number };
           // 通过hex值获取对应色号系统的色号
-          const displayKey = getColorKeyByHex(data.color, savedColorSystem as ColorSystem || 'MARD');
+  const displayKey = getColorKeyByHex(
+    data.color,
+    normalizeColorSystem(savedColorSystem)
+  );
           return {
             color: data.color,
             name: displayKey, // 使用色号系统的色号作为名称
