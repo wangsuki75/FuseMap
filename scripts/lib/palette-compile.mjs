@@ -85,3 +85,22 @@ export function compilePalettes(srcDir) {
 
   return { palettes, problems };
 }
+
+/** 把编译结果渲染成可提交的 TypeScript 模块。 */
+export function renderTypeScript(palettes, meta) {
+  return `// 本文件由 scripts/build-palettes.mjs 自动生成，请勿手工编辑。
+// 数据来源：${meta.repo}
+// 上游提交：${meta.commit}
+//
+// 上游色值为公开渠道整理与实测采样值，非品牌官方发布数据，详见仓库根目录 NOTICE。
+
+import type { PaletteSpec } from '../types';
+
+export const PALETTE_SOURCE = {
+  repo: ${JSON.stringify(meta.repo)},
+  commit: ${JSON.stringify(meta.commit)},
+} as const;
+
+export const PALETTES: PaletteSpec[] = ${JSON.stringify(palettes, null, 2)};
+`;
+}

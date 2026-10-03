@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { compilePalettes, normalizeHex, SPECS } from '../../scripts/lib/palette-compile.mjs';
+import {
+  compilePalettes,
+  normalizeHex,
+  renderTypeScript,
+  SPECS,
+} from '../../scripts/lib/palette-compile.mjs';
 
 const SRC = 'vendor/pindou-color-data';
 
@@ -63,5 +68,37 @@ describe('compilePalettes', () => {
   it('不透明色号不带 alpha 字段', () => {
     const coco = palettes.find((p) => p.id === 'coco-291');
     expect(coco?.colors.every((c) => c.alpha === undefined)).toBe(true);
+  });
+});
+
+describe('renderTypeScript', () => {
+  const meta = {
+    repo: 'https://github.com/HansBug/pindou-color-data',
+    commit: '178dafbc9e77d3de556550dbd058270200129186',
+  };
+
+  it('产出文件带自动生成声明与来源标注', () => {
+    const { palettes } = compilePalettes(SRC);
+    const out = renderTypeScript(palettes, meta);
+    expect(out).toContain('自动生成');
+    expect(out).toContain(meta.commit);
+    expect(out).toContain(meta.repo);
+  });
+
+  it('导出 PALETTES 与 PALETTE_SOURCE', () => {
+    const { palettes } = compilePalettes(SRC);
+    const out = renderTypeScript(palettes, meta);
+    expect(out).toContain('export const PALETTES');
+    expect(out).toContain('export const PALETTE_SOURCE');
+  });
+
+  it('内联的色板数据可被 JSON 还原且数量一致', () => {
+    const { palettes } = compilePalettes(SRC);
+    const out = renderTypeScript(palettes, meta);
+    const start = out.indexOf('export const PALETTES: PaletteSpec[] = ');
+    const json = out.slice(start + 'export const PALETTES: PaletteSpec[] = '.length).replace(/;\s*$/, '');
+    const parsed = JSON.parse(json);
+    expect(parsed).toHaveLength(9);
+    expect(parsed.reduce((n: number, p: { colors: unknown[] }) => n + p.colors.length, 0)).toBe(2496);
   });
 });
