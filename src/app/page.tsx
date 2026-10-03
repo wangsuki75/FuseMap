@@ -91,8 +91,18 @@ export default function Home() {
   const [originalImageSrc, setOriginalImageSrc] = useState<string | null>(null);
   const [granularity, setGranularity] = useState<number>(50);
   const [granularityInput, setGranularityInput] = useState<string>("50");
-  const [similarityThreshold, setSimilarityThreshold] = useState<number>(30);
-  const [similarityThresholdInput, setSimilarityThresholdInput] = useState<string>("30");
+  /**
+   * 颜色合并阈值。距离用 OKLab 欧氏距离 ×100 度量，参考刻度：
+   *   0–2  几乎无差别（抗锯齿产生的近似色）
+   *   3–5  同一色系的深浅近似
+   *   10+  肉眼可辨的不同颜色
+   *   20+  明显不同的颜色（例如浅蓝与白）
+   *
+   * 默认取 2：只清掉近似重复色，不动真正不同的颜色。
+   * 上游基线默认是 30，在该刻度下会把整张图合并成两三个颜色，等于废掉成品。
+   */
+  const [similarityThreshold, setSimilarityThreshold] = useState<number>(2);
+  const [similarityThresholdInput, setSimilarityThresholdInput] = useState<string>("2");
   // 添加像素化模式状态
   const [pixelationMode, setPixelationMode] = useState<PixelationMode>(PixelationMode.Dominant); // 默认为卡通模式
   
@@ -2228,7 +2238,7 @@ export default function Home() {
                 <div className="flex-1">
                     {/* Label color */}
                     <label htmlFor="similarityThresholdInput" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5 sm:mb-2">
-                        颜色合并阈值 (0-100):
+                        颜色合并阈值 (0-100)
                     </label>
                     <div className="flex items-center gap-2">
                       {/* Input field styles */}
@@ -2242,6 +2252,11 @@ export default function Home() {
                         max="100"
                       />
                     </div>
+                    <p className="mt-1 text-[11px] leading-tight text-gray-500 dark:text-gray-400">
+                      0 = 不合并。建议 0–3，只清掉肉眼难分的近似色。
+                      <br />
+                      数值过大会把明显不同的颜色也并掉：20 就会让浅蓝和白色变成同一个色号。
+                    </p>
                 </div>
 
                 {/* 快捷按钮 */}
