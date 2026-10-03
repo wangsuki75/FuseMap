@@ -14,6 +14,8 @@ interface Props {
   isCustomPalette: boolean;
   onChange: (palette: PaletteSpec) => void;
   onOpenColorPicker: () => void;
+  /** 解除所有色号限制，恢复为该色板全选 */
+  onResetAll: () => void;
 }
 
 /**
@@ -29,6 +31,7 @@ export default function PaletteSelector({
   isCustomPalette,
   onChange,
   onOpenColorPicker,
+  onResetAll,
 }: Props) {
   const current = listPalettes().find((p) => p.id === paletteId);
   const [brandId, setBrandId] = useState<BrandId>(current?.brandId ?? BRANDS[0].id);
@@ -92,9 +95,18 @@ export default function PaletteSelector({
       </button>
 
       {isCustomPalette && (
-        <p className="mt-1.5 text-center text-xs text-blue-500 dark:text-blue-400">
-          当前只使用你勾选的 {selectedCount} 个色号
-        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <p className="text-xs text-blue-500 dark:text-blue-400">
+            当前只使用你勾选的 {selectedCount} 个色号，其余颜色不会出现在图纸里
+          </p>
+          <button
+            type="button"
+            onClick={onResetAll}
+            className="rounded border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
+          >
+            恢复全部色号
+          </button>
+        </div>
       )}
     </div>
   );

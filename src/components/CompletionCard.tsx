@@ -253,9 +253,6 @@ const CompletionCard: React.FC<CompletionCardProps> = ({
           ctx.font = '14px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
           ctx.fillStyle = 'rgba(255,255,255,0.7)';
           ctx.fillText('七卡瓦拼豆底稿生成器', cardWidth / 2, cardHeight - 50);
-          ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-          ctx.fillStyle = 'rgba(255,255,255,0.5)';
-          ctx.fillText('perlerbeadsold.zippland.com', cardWidth / 2, cardHeight - 25);
 
           resolve(canvas.toDataURL('image/jpeg', 0.95));
           
@@ -366,9 +363,6 @@ const CompletionCard: React.FC<CompletionCardProps> = ({
               ctx.shadowColor = 'rgba(0,0,0,0.5)';
               ctx.shadowBlur = 4;
               ctx.fillText('七卡瓦拼豆底稿生成器', cardWidth / 2, cardHeight - 40);
-              ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-              ctx.fillStyle = 'rgba(255,255,255,0.6)';
-              ctx.fillText('perlerbeadsold.zippland.com', cardWidth / 2, cardHeight - 20);
               ctx.shadowBlur = 0;
 
               resolve(canvas.toDataURL('image/jpeg', 0.95));
@@ -382,9 +376,6 @@ const CompletionCard: React.FC<CompletionCardProps> = ({
             ctx.shadowColor = 'rgba(0,0,0,0.5)';
             ctx.shadowBlur = 4;
             ctx.fillText('七卡瓦拼豆底稿生成器', cardWidth / 2, cardHeight - 40);
-            ctx.font = '12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            ctx.fillStyle = 'rgba(255,255,255,0.6)';
-            ctx.fillText('perlerbeadsold.zippland.com', cardWidth / 2, cardHeight - 20);
             ctx.shadowBlur = 0;
 
             resolve(canvas.toDataURL('image/jpeg', 0.95));
