@@ -1,0 +1,25 @@
+本项目基于以下开源项目派生，在此致谢：
+
+  Zippland/perler-beads
+  https://github.com/Zippland/perler-beads
+  许可：AGPL-3.0
+  本仓库对其进行了修改（色卡数据模型重构、渲染层重写等），修改自 2026-10 起。
+
+色卡数据来源：
+
+  HansBug/pindou-color-data
+  https://github.com/HansBug/pindou-color-data
+  许可：MIT
+  锁定提交：178dafbc9e77d3de556550dbd058270200129186
+  说明：该仓库的色值为公开渠道整理与实测采样值，非品牌官方发布数据。
+        其上游来源包括多个公开工具站与公开源码库，详见该仓库 README。
+
+商标声明：
+
+  MARD、Perler、Hama、Artkal、COCO、漫漫、盼盼、咪小窝 等均为其各自权利人的商标。
+  本项目与上述品牌无任何关联，也未获其背书，仅在"兼容某色号体系"的描述性意义上使用这些名称。
+
+色值免责：
+
+  本项目展示的屏幕色值为近似值，受显示器、环境光、打印设备与生产批次影响。
+  大批量采购前请核对实体色卡。
