@@ -1,9 +1,9 @@
 name: CI
 
-on:
-  push:
-    branches: [master]
-  pull_request:
+# 监听所有分支的 push 与所有 PR。
+# 不用 branches 过滤器是有意的：pull_request 事件的工作流定义取自 base 分支，
+# 而 master 上还没有这个文件时，PR 不会触发任何检查。
+on: [push, pull_request]
 
 jobs:
   verify:
