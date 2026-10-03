@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: 单元测试
+        run: npm test
+
+      - name: core 无框架依赖检查
+        run: npm run typecheck:core
+
+      - name: 代码规范
+        run: npm run lint
+
+      - name: 构建
+        run: npm run build
+
+      - name: 色卡产物与上游一致
+        run: |
+          node scripts/build-palettes.mjs
+          git diff --exit-code src/core/palette/generated/palettes.ts
